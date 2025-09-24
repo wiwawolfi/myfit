@@ -24,134 +24,134 @@
     .wrap{max-width:980px;margin:0 auto}
     header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
     h1{font-size:20px}
-    .row{display:flex;gap:12px}
-    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;flex:1;box-shadow:0 6px 30px rgba(2,6,23,0.6)}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-    button{cursor:pointer}
-    .muted{color:var(--muted);font-size:13px}
-    ul{list-style:none;padding:0;margin:0}
-    li{padding:10px 0;border-bottom:1px dashed rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
-    .small{font-size:13px}
-    .totals{display:flex;gap:8px;flex-wrap:wrap}
-    .pill{background:var(--glass);padding:8px 10px;border-radius:999px;font-weight:600}
-    footer{margin-top:18px;color:var(--muted);font-size:13px}
     .tabbar{display:flex;gap:8px;margin-bottom:12px;overflow-x:auto}
     .tab{padding:8px 12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.03);cursor:pointer;white-space:nowrap}
     .tab.active{background:linear-gradient(90deg,var(--accent), #7dd3fc22);color:#001}
-    .controls{display:flex;gap:8px}
-    .flex{display:flex;gap:8px}
-    .mini{padding:6px 8px;font-size:13px}
-    .danger{background:transparent;border:1px solid rgba(255,0,0,0.2);color:#ff8b8b}
-    .green{background:transparent;border:1px solid rgba(16,185,129,0.12);color:var(--success)}
-    .center{display:flex;align-items:center;justify-content:center}
-    .kbd{background:#0b1220;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);font-family:monospace}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;flex:1;box-shadow:0 6px 30px rgba(2,6,23,0.6);margin-bottom:12px}
+    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
     .img-preview{max-width:120px;border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
     .coach-box{height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(0,0,0,0.06)}
     .note{font-size:13px;color:var(--muted)}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#06b6d4,#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:700">MF+</div>
-      <div>
-        <h1>MyFit+ — Personal AI Fitness & Lifestyle Coach</h1>
-        <div class="muted">Local-first. Optional OpenAI features (enter key in Settings).</div>
-      </div>
-    </header>
+<div class="wrap">
+  <header>
+    <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#06b6d4,#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:700">MF+</div>
+    <div>
+      <h1>MyFit+ — Personal AI Fitness & Lifestyle Coach</h1>
+      <div class="muted">Local-first. Optional OpenAI features (enter key in Settings).</div>
+    </div>
+  </header>
 
-    <div class="tabbar" id="tabs"></div>
-    <main id="main"></main>
+  <div class="tabbar" id="tabs"></div>
+  <main id="main"></main>
 
-    <footer>
-      Tip: After you’re happy with the page, use Chrome's menu → "Add to Home screen" to install it like an app.
-    </footer>
-  </div>
+  <footer>
+    Tip: After you’re happy with the page, use Chrome's menu → "Add to Home screen" to install it like an app.
+  </footer>
+</div>
 
-  <input id="file-input" type="file" accept="application/json" style="display:none">
-  <input id="img-input" type="file" accept="image/*" style="display:none">
+<input id="img-input" type="file" accept="image/*" style="display:none">
 
-  <script>
-    // --- App State ---
-    const state = { tab: 'Dashboard', apiKey:'', model:'gpt-4o-mini', workouts:[], messages:[], outfitImage:null };
+<script>
+  // --- App State ---
+  const state = { tab: 'Dashboard', apiKey:'', model:'gpt-4o-mini', workouts:[], messages:[], outfitImage:null };
 
-    const tabs = ['Dashboard','Workout Plan','AI Coach','Style & Grooming','Camera & Pose','Settings'];
+  const tabs = ['Dashboard','Workout Plan','AI Coach','Style & Grooming','Camera & Pose','Settings'];
 
-    function renderTabs(){
-      const tabbar = document.getElementById('tabs');
-      tabbar.innerHTML='';
-      tabs.forEach(t=>{
-        const el = document.createElement('div');
-        el.className='tab'+(state.tab===t?' active':'');
-        el.textContent=t;
-        el.onclick=()=>{state.tab=t; renderMain(); renderTabs();};
-        tabbar.appendChild(el);
-      });
-    }
-
-    function renderMain(){
-      const main = document.getElementById('main');
-      main.innerHTML='';
-      if(state.tab==='Dashboard'){
-        const c = document.createElement('div'); c.className='card'; c.innerHTML='<h2>Welcome to MyFit+</h2><p>Track workouts, calories, and more.</p>'; main.appendChild(c);
-      } else if(state.tab==='Workout Plan'){
-        const c = document.createElement('div'); c.className='card'; c.innerHTML='<h2>Workout Plan</h2><p>AI-generated plans will appear here.</p><button onclick="alert(\'Generate plan with AI (requires OpenAI key)\')">Generate (AI)</button>'; main.appendChild(c);
-      } else if(state.tab==='AI Coach'){
-        const c = document.createElement('div'); c.className='card'; c.innerHTML='<h2>AI Coach</h2><div class="coach-box" id="coach-box"></div><textarea id="coach-input" placeholder="Ask something..." style="margin-top:6px"></textarea><button onclick="sendMessage()">Send</button>'; main.appendChild(c);
-      } else if(state.tab==='Style & Grooming'){
-        const c = document.createElement('div'); c.className='card';
-        c.innerHTML='<h2>Style & Grooming</h2><button onclick="document.getElementById(\'img-input\').click()">Upload Outfit Photo</button><div id=\'outfit-preview\'></div><p class=\'note\'>AI review requires OpenAI key.</p>';
-        main.appendChild(c);
-      } else if(state.tab==='Camera & Pose'){
-        const c = document.createElement('div'); c.className='card'; c.innerHTML='<h2>Camera & Pose</h2><video id=\'video\' width=\'100%\' autoplay muted playsinline></video><p class=\'note\'>Local rep counting & posture detection.</p>'; main.appendChild(c);
-        if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia({video:true}).then(s=>{document.getElementById('video').srcObject=s;});}
-      } else if(state.tab==='Settings'){
-        const c = document.createElement('div'); c.className='card';
-        c.innerHTML=`<h2>Settings</h2>
-          <label>OpenAI API Key</label><input type='text' id='apiKey' placeholder='sk-...'>
-          <label>AI Model</label><select id='model'><option value='gpt-4o-mini'>gpt-4o-mini</option><option value='gpt-3.5-turbo'>gpt-3.5-turbo</option></select>
-          <button onclick='saveSettings()'>Save</button>
-          <button onclick='exportData()'>Export Data</button>
-          <button class='danger' onclick='clearKey()'>Clear API Key</button>`;
-        main.appendChild(c);
-        document.getElementById('apiKey').value=state.apiKey;
-        document.getElementById('model').value=state.model;
-      }
-    }
-
-    function saveSettings(){
-      state.apiKey=document.getElementById('apiKey').value.trim();
-      state.model=document.getElementById('model').value;
-      alert('Settings saved locally.');
-    }
-
-    function exportData(){
-      const data = JSON.stringify(state);
-      const blob = new Blob([data], {type:'application/json'});
-      const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='myfitplus-data.json'; a.click();
-    }
-
-    function clearKey(){state.apiKey='';document.getElementById('apiKey').value=''; alert('API Key cleared.');}
-
-    function sendMessage(){
-      const input=document.getElementById('coach-input');
-      if(!input.value) return;
-      const box=document.getElementById('coach-box');
-      const msg=document.createElement('div'); msg.textContent='You: '+input.value; box.appendChild(msg);
-      box.scrollTop=box.scrollHeight;
-      input.value='';
-      // Here you could call OpenAI API using state.apiKey and state.model
-    }
-
-    document.getElementById('img-input').addEventListener('change',e=>{
-      const file=e.target.files[0]; if(!file) return;
-      const url=URL.createObjectURL(file);
-      state.outfitImage=url;
-      document.getElementById('outfit-preview').innerHTML=`<img src='${url}' class='img-preview'>`;
+  function renderTabs(){
+    const tabbar = document.getElementById('tabs');
+    tabbar.innerHTML='';
+    tabs.forEach(t=>{
+      const el = document.createElement('div');
+      el.className='tab'+(state.tab===t?' active':'');
+      el.textContent=t;
+      el.onclick=()=>{state.tab=t; renderMain(); renderTabs();};
+      tabbar.appendChild(el);
     });
+  }
 
-    renderTabs(); renderMain();
-  </script>
+  function renderMain(){
+    const main = document.getElementById('main');
+    main.innerHTML='';
+    if(state.tab==='Dashboard'){
+      const c = document.createElement('div'); 
+      c.className='card'; 
+      c.innerHTML='<h2>Welcome to MyFit+</h2><p>Track workouts, calories, and more.</p>'; 
+      main.appendChild(c);
+    } else if(state.tab==='Workout Plan'){
+      const c = document.createElement('div'); 
+      c.className='card'; 
+      c.innerHTML='<h2>Workout Plan</h2><p>AI-generated plans will appear here.</p><button onclick="alert(\'Generate plan with AI (requires OpenAI key)\')">Generate (AI)</button>'; 
+      main.appendChild(c);
+    } else if(state.tab==='AI Coach'){
+      const c = document.createElement('div'); 
+      c.className='card'; 
+      c.innerHTML='<h2>AI Coach</h2><div class="coach-box" id="coach-box"></div><textarea id="coach-input" placeholder="Ask something..." style="margin-top:6px"></textarea><button onclick="sendMessage()">Send</button>'; 
+      main.appendChild(c);
+    } else if(state.tab==='Style & Grooming'){
+      const c = document.createElement('div'); 
+      c.className='card';
+      c.innerHTML='<h2>Style & Grooming</h2><button onclick="document.getElementById(\'img-input\').click()">Upload Outfit Photo</button><div id="outfit-preview"></div><p class="note">AI review requires OpenAI key.</p>';
+      main.appendChild(c);
+    } else if(state.tab==='Camera & Pose'){
+      const c = document.createElement('div'); 
+      c.className='card'; 
+      c.innerHTML='<h2>Camera & Pose</h2><video id="video" width="100%" autoplay muted playsinline></video><p class="note">Local rep counting & posture detection.</p>'; 
+      main.appendChild(c);
+      if(navigator.mediaDevices){navigator.mediaDevices.getUserMedia({video:true}).then(s=>{document.getElementById('video').srcObject=s;});}
+    } else if(state.tab==='Settings'){
+      const c = document.createElement('div'); 
+      c.className='card';
+      c.innerHTML=`
+        <h2>Settings</h2>
+        <label>OpenAI API Key</label><input type='text' id='apiKey' placeholder='sk-...'>
+        <label>AI Model</label><select id='model'><option value='gpt-4o-mini'>gpt-4o-mini</option><option value='gpt-3.5-turbo'>gpt-3.5-turbo</option></select>
+        <button onclick='saveSettings()'>Save</button>
+        <button onclick='exportData()'>Export Data</button>
+        <button style="background:transparent;border:1px solid rgba(255,0,0,0.2);color:#ff8b8b" onclick='clearKey()'>Clear API Key</button>`;
+      main.appendChild(c);
+      document.getElementById('apiKey').value=state.apiKey;
+      document.getElementById('model').value=state.model;
+    }
+  }
+
+  function saveSettings(){
+    state.apiKey=document.getElementById('apiKey').value.trim();
+    state.model=document.getElementById('model').value;
+    alert('Settings saved locally.');
+  }
+
+  function exportData(){
+    const data = JSON.stringify(state);
+    const blob = new Blob([data], {type:'application/json'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='myfitplus-data.json'; a.click();
+  }
+
+  function clearKey(){state.apiKey='';document.getElementById('apiKey').value=''; alert('API Key cleared.');}
+
+  function sendMessage(){
+    const input=document.getElementById('coach-input');
+    if(!input.value) return;
+    const box=document.getElementById('coach-box');
+    const msg=document.createElement('div'); msg.textContent='You: '+input.value; box.appendChild(msg);
+    box.scrollTop=box.scrollHeight;
+    input.value='';
+    // AI call placeholder (use OpenAI API if key provided)
+  }
+
+  document.getElementById('img-input').addEventListener('change',e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const url=URL.createObjectURL(file);
+    state.outfitImage=url;
+    document.getElementById('outfit-preview').innerHTML=`<img src='${url}' class='img-preview'>`;
+  });
+
+  renderTabs(); 
+  renderMain();
+</script>
 </body>
 </html>
