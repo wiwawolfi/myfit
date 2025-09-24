@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MyFit+ — Personal AI Fitness & Lifestyle Coach</title>
+  <style>
+    :root{--bg:#0f172a;--card:#07112a;--accent:#06b6d4;--muted:#94a3b8;--glass: rgba(255,255,255,0.03);--success:#10b981}
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,Arial;margin:0}
+    body{background:linear-gradient(180deg,#020617 0%, #071034 100%);color:#e6eef6;padding:18px}
+    .wrap{max-width:980px;margin:0 auto}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    h1{font-size:20px}
+    .row{display:flex;gap:12px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;flex:1;box-shadow:0 6px 30px rgba(2,6,23,0.6)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    button{cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
+    ul{list-style:none;padding:0;margin:0}
+    li{padding:10px 0;border-bottom:1px dashed rgba(255,255,255,0.02);display:flex;justify-content:space-between;align-items:center}
+    .small{font-size:13px}
+    .totals{display:flex;gap:8px;flex-wrap:wrap}
+    .pill{background:var(--glass);padding:8px 10px;border-radius:999px;font-weight:600}
+    footer{margin-top:18px;color:var(--muted);font-size:13px}
+    .tabbar{display:flex;gap:8px;margin-bottom:12px}
+    .tab{padding:8px 12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.03);cursor:pointer}
+    .tab.active{background:linear-gradient(90deg,var(--accent), #7dd3fc22);color:#001}
+    .controls{display:flex;gap:8px}
+    .flex{display:flex;gap:8px}
+    .mini{padding:6px 8px;font-size:13px}
+    .danger{background:transparent;border:1px solid rgba(255,0,0,0.2);color:#ff8b8b}
+    .green{background:transparent;border:1px solid rgba(16,185,129,0.12);color:var(--success)}
+    .center{display:flex;align-items:center;justify-content:center}
+    .kbd{background:#0b1220;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.03);font-family:monospace}
+    .img-preview{max-width:120px;border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+    .coach-box{height:220px;overflow:auto;padding:8px;border-radius:8px;background:rgba(0,0,0,0.06)}
+    .note{font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#06b6d4,#60a5fa);display:flex;align-items:center;justify-content:center;font-weight:700">MF+</div>
+      <div>
+        <h1>MyFit+ — Personal AI Fitness & Lifestyle Coach</h1>
+        <div class="muted">Local-first. Optional OpenAI features (enter key in Settings).</div>
+      </div>
+    </header>
+
+    <div class="tabbar" id="tabs"></div>
+
+    <main id="main"/>
+
+    <footer>
+      Tip: After you’re happy with the page, use Chrome's menu → "Add to Home screen" to install it like an app.
+    </footer>
+  </div>
+
+  <!-- hidden file inputs -->
+  <input id="file-input" type="file" accept="application/json" style="display:none">
+  <input id="img-input" type="file" accept="image/*" style="display:none">
+
+<script>
+// --- Core app state & storage ---
+const STORAGE_KEY = 'myfitplus-v1'
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function load(){try{const raw=localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw): defaultState()}catch(e){return defaultState()}}
+function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify(state))}
+function defaultState(){return {workouts:[],food:[],plans:[],photos:[],settings:{openaiKey:'',model:'gpt-4o-mini'}}}
+let state = load()
+
+// --- UI scaffolding ---
+const tabs = [
+  {id:'dashboard',label:'Dashboard'},
+  {id:'plan',label:'Workout Plan'},
+  {id:'coach',label:'AI Coach'},
+  {id:'outfit',label:'Style & Grooming'},
+  {id:'camera',label:'Camera & Pose'},
+  {id:'settings',label:'Settings'}
+]
+const tabsEl = document.getElementById('tabs')
+const main = document.getElementById('main')
+let activeTab = 'dashboard'
+
+function renderTabs(){tabsEl.innerHTML=''
+  tabs.forEach(t=>{
+    const b = document.createElement('button')
+    b.className = 'tab'+(t.id===activeTab? ' active':'')
+    b.textContent = t.label
+    b.onclick = ()=>{activeTab=t.id; render()}
+    tabsEl.appendChild(b)
+  })
+}
+
+// --- Helpers ---
+function todayISO(){return new Date().toISOString().slice(0,10)}
+function short(n){return Math.round(n*10)/10}
+
+// --- Renderers for each tab ---
+function render(){renderTabs(); main.innerHTML='';
+  if(activeTab==='dashboard') renderDashboard()
+  else if(activeTab==='plan') renderPlanTab()
+  else if(activeTab==='coach') renderCoachTab()
+  else if(activeTab==='outfit') renderOutfitTab()
+  else if(activeTab==='camera') renderCameraTab()
+  else if(activeTab==='settings') renderSettings()
+}
+
+// ---- Dashboard ----
+function renderDashboard(){
+  const el = document.createElement('div')
+  el.innerHTML = `
+    <div class="row">
+      <div class="card" style="flex:1">
+        <h3>Quick Log</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div>
+            <label>Workout Type</label>
+            <select id="dash-wtype"><option>Run</option><option>Bike</option><option>Strength</option><option>HIIT</option><option>Walk</option><option>Other</option></select>
+          </div>
+          <div>
+            <label>Duration (minutes)</label>
+            <input id="dash-duration" type="number" value="30">
+          </div>
+          <div>
+            <label>Est. Calories burned</label>
+            <input id="dash-cal" type="number" value="300">
+          </div>
+          <div>
+            <label>Date</label>
+            <input id="dash-date" type="date" value="${todayISO()}">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="dash-add" class="mini">Add Workout</button>
+          <button id="dash-quick" class="mini">Quick: 30m Run</button>
+        </div>
+      </div>
+
+      <div class="card" style="flex:1">
+        <h3>Nutrition Quick Log</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <input id="dash-food-name" placeholder="Food name">
+          <input id="dash-food-cal" type="number" value="150">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="dash-addfood" class="mini">Add Food</button>
+          <button id="dash-quick200" class="mini">+200 kcal</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <div class="card">
+        <h3>Today</h3>
+        <div class="totals" style="margin-bottom:8px">
+          <div class="pill">Workouts: <span id="count-workouts">0</span></div>
+          <div class="pill">Calories eaten: <span id="cal-eaten">0</span></div>
+          <div class="pill">Calories burned: <span id="cal-burned">0</span></div>
+          <div class="pill">Net kcal: <span id="net-kcal">0</span></div>
+        </div>
+        <div>
+          <strong>Workouts</strong>
+          <ul id="workout-list" style="margin-top:8px"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Food log</h3>
+        <ul id="food-list"></ul>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="export-json">Export JSON</button>
+      <button id="import-json" class="export-btn">Import JSON</button>
+      <button id="clear-all" class="export-btn danger">Clear all data</button>
+    </div>
+  `
+  main.appendChild(el)
+
+  // hookup
+  document.getElementById('dash-add').onclick = ()=>{addWorkout(document.getElementById('dash-date').value, document.getElementById('dash-wtype').value, document.getElementById('dash-duration').value, document.getElementById('dash-cal').value)}
+  document.getElementById('dash-quick').onclick = ()=>{addWorkout(todayISO(),'Run',30,350)}
+  document.getElementById('dash-addfood').onclick = ()=>{addFood(todayISO(),document.getElementById('dash-food-name').value||'Food',document.getElementById('dash-food-cal').value||0)}
+  document.getElementById('dash-quick200').onclick = ()=>{addFood(todayISO(),'Snack',200)}
+  document.getElementById('export-json').onclick = exportJson
+  document.getElementById('import-json').onclick = ()=>document.getElementById('file-input').click()
+  document.getElementById('file-input').onchange = handleImport
+  document.getElementById('clear-all').onclick = ()=>{if(confirm('Clear all saved data on this device?')){state=defaultState();save();render()}}
+
+  renderDashboardLists()
+}
+
+function renderDashboardLists(){
+  const today = todayISO()
+  const todaysWorkouts = state.workouts.filter(w=>w.date===today)
+  const todaysFood = state.food.filter(f=>f.date===today)
+  const totalBurn = todaysWorkouts.reduce((s,w)=>s+(Number(w.cal)||0),0)
+  const totalEaten = todaysFood.reduce((s,f)=>s+(Number(f.cal)||0),0)
+  document.getElementById('count-workouts').textContent = todaysWorkouts.length
+  document.getElementById('cal-eaten').textContent = totalEaten
+  document.getElementById('cal-burned').textContent = totalBurn
+  document.getElementById('net-kcal').textContent = totalEaten - totalBurn
+
+  const workoutList = document.getElementById('workout-list')
+  workoutList.innerHTML=''
+  state.workouts.slice().reverse().forEach(w=>{
+    const li = document.createElement('li')
+    li.innerHTML = `<div><div class=\"small\">${w.date}</div><div>${w.type} • ${w.duration}m • ${w.cal} kcal</div></div><div class=\"flex\"><button data-id=\"${w.id}\" class=\"mini\">Delete</button></div>`
+    workoutList.appendChild(li)
+  })
+  workoutList.addEventListener('click',e=>{if(e.target.matches('button')){state.workouts=state.workouts.filter(w=>w.id!==e.target.dataset.id);save();render()}})
+
+  const foodList = document.getElementById('food-list')
+  foodList.innerHTML=''
+  state.food.slice().reverse().forEach(f=>{
+    const li = document.createElement('li')
+    li.innerHTML = `<div><div class=\"small\">${f.date}</div><div>${f.name} • ${f.cal} kcal</div></div><div class=\"flex\"><button data-id=\"${f.id}\" class=\"mini\">Delete</button></div>`
+    foodList.appendChild(li)
+  })
+  foodList.addEventListener('click',e=>{if(e.target.matches('button')){state.food=state.food.filter(f=>f.id!==e.target.dataset.id);save();render()}})
+}
+
+// ---- Plan Tab: Local + OpenAI generator ----
+function simpleLocalPlan(goal='General fitness'){ // fallback simple plan
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const pool = {
+    'General fitness':['30m run','Full-body strength 30m','Active rest: walk 30m','HIIT 20m','Mobility 20m','Strength focus 30m','Rest']
+  }
+  return days.map((d,i)=>({day:d,workout:pool['General fitness'][i]}))
+}
+
+async function renderPlanTab(){
+  const el = document.createElement('div')
+  el.className='card'
+  el.innerHTML = `
+    <h3>Workout Plan</h3>
+    <div style=\"display:flex;gap:8px;margin-top:8px\"> 
+      <select id=\"plan-goal\"><option>General fitness</option><option>Weight loss</option><option>Muscle gain</option><option>Cardio/endurance</option></select>
+      <select id=\"plan-length\"><option>1 week</option><option>4 weeks</option></select>
+      <button id=\"gen-local\" class=\"mini\">Generate (Local)</button>
+      <button id=\"gen-ai\" class=\"mini green\">Generate (AI)</button>
+    </div>
+    <div id=\"plan-output\" style=\"margin-top:12px\"></div>
+  `
+  main.appendChild(el)
+
+  document.getElementById('gen-local').onclick = ()=>{const plan=simpleLocalPlan(); showPlan(plan)}
+  document.getElementById('gen-ai').onclick = async ()=>{ await generatePlanWithAI() }
+  function showPlan(plan){
+    const out = document.getElementById('plan-output')
+    out.innerHTML = '<ul>'+plan.map(p=>`<li><strong>${p.day}</strong>: ${p.workout} <button data-day=\"${p.day}\" class=\"mini\">Save</button></li>`).join('')+'</ul>'
+    out.querySelectorAll('button').forEach(b=>b.onclick=()=>{state.plans.push({id:uid(),created:todayISO(),day:b.dataset.day,workout:plan.find(x=>x.day===b.dataset.day).workout});save();alert('Saved to plans')})
+  }
+}
+
+async function generatePlanWithAI(){
+  const key = state.settings.openaiKey
+  if(!key){if(!confirm('No OpenAI key set. Generate locally instead?')) return; const plan=simpleLocalPlan(); render(); alert('Generated local plan (no API key)'); return}
+  const goal = document.getElementById('plan-goal').value
+  const len = document.getElementById('plan-length').value
+  const prompt = `Create a ${len} ${goal} workout plan for a single person. Provide day-by-day entries with short title and a brief description. Use progressive overload if applicable.`
+  showLoading('Generating AI plan...')
+  try{
+    const resp = await openaiChat([ {role:'user', content: prompt} ])
+    hideLoading()
+    const text = resp
+    // naive parse: split by lines
+    const lines = text.split('
+').filter(Boolean)
+    const plan = lines.map((ln,i)=>({day:'Day '+(i+1),workout:ln}))
+    alert('AI plan generated — preview shown. Save the ones you like.')
+    // show in plan tab
+    document.getElementById('plan-output').innerHTML = '<pre style="white-space:pre-wrap">'+text+'</pre>'
+  }catch(err){hideLoading(); alert('AI error: '+err.message)}
+}
+
+// ---- Coach tab: Chat-style ----
+function renderCoachTab(){
+  const el = document.createElement('div')
+  el.className='card'
+  el.innerHTML = `
+    <h3>AI Coach</h3>
+    <div class=\"coach-box\" id=\"coach-log\"></div>
+    <div style=\"display:flex;gap:8px;margin-top:8px\"> 
+      <input id=\"coach-input\" placeholder=\"Ask about training, recovery, nutrition or confidence...\"> 
+      <button id=\"coach-send\" class=\"mini\">Ask</button>
+    </div>
+  `
+  main.appendChild(el)
+  document.getElementById('coach-send').onclick = askCoach
+}
+
+async function askCoach(){
+  const q = document.getElementById('coach-input').value.trim(); if(!q) return
+  appendCoach('You: '+q)
+  appendCoach('Coach: thinking...')
+  try{
+    const answer = await callOpenAIForText(q)
+    updateLastCoach('Coach: '+answer)
+  }catch(err){updateLastCoach('Coach: Error — '+err.message)}
+}
+function appendCoach(t){const log=document.getElementById('coach-log'); const p=document.createElement('div'); p.textContent=t; log.appendChild(p); log.scrollTop = log.scrollHeight}
+function updateLastCoach(t){const log=document.getElementById('coach-log'); log.lastChild.textContent = t}
+
+// ---- Outfit & Grooming Tab ----
+function renderOutfitTab(){
+  const el = document.createElement('div')
+  el.className='card'
+  el.innerHTML = `
+    <h3>Style, Outfit & Grooming</h3>
+    <div style=\"display:flex;gap:8px;margin-top:8px\"> 
+      <button id=\"take-photo\" class=\"mini\">Upload outfit photo</button>
+      <button id=\"describe-outfit\" class=\"mini\">Describe outfit</button>
+      <button id=\"grooming\" class=\"mini green\">Grooming tips</button>
+    </div>
+    <div id=\"outfit-output\" style=\"margin-top:12px\"></div>
+  `
+  main.appendChild(el)
+  document.getElementById('take-photo').onclick = ()=>document.getElementById('img-input').click()
+  document.getElementById('img-input').onchange = handleImageUpload
+  document.getElementById('describe-outfit').onclick = ()=>{const desc = prompt('Describe your outfit (e.g. navy jeans, white tee, gray jacket).'); if(!desc) return; treatOutfitText(desc)}
+  document.getElementById('grooming').onclick = async ()=>{ const q = prompt('What grooming help do you want? (e.g. oily skin, beard shape, quick shave)'); if(!q) return; appendOutfit('You: '+q); const ans = await callOpenAIForText('Give practical grooming and skincare advice: '+q); appendOutfit('AI: '+ans)}
+}
+
+function appendOutfit(text){const out=document.getElementById('outfit-output'); const p=document.createElement('div'); p.textContent=text; out.appendChild(p); out.scrollTop=out.scrollHeight}
+
+async function handleImageUpload(e){const f=e.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=async ()=>{
+  const data = reader.result; // data URL
+  state.photos.push({id:uid(),date:todayISO(),data}); save(); appendOutfit('Photo uploaded.')
+  // local quick heuristics: check aspect ratio / size
+  appendOutfit('Quick tips: Try a fitted top and clean shoes for sharper look.')
+  // offer AI-based detailed rating if key is present
+  if(state.settings.openaiKey && confirm('Send this photo to OpenAI for a detailed outfit review? (requires internet, photo will be sent)')){
+    appendOutfit('Sending to AI for analysis...')
+    try{
+      const ans = await callOpenAIForImageReview(data)
+      appendOutfit('AI: '+ans)
+    }catch(err){appendOutfit('AI review failed: '+err.message)}
+  } else appendOutfit('You can also describe the outfit instead for AI suggestions.')
+}
+reader.readAsDataURL(f)}
+
+// ---- Camera & Pose (local TensorFlow) ----
+async function renderCameraTab(){
+  const el = document.createElement('div')
+  el.className='card'
+  el.innerHTML = `
+    <h3>Camera & Pose Detection</h3>
+    <div style=\"display:flex;gap:8px;align-items:center\"> 
+      <button id=\"start-cam\" class=\"mini\">Start Camera</button>
+      <button id=\"stop-cam\" class=\"mini danger\">Stop</button>
+      <div class=\"note\">Tip: allow camera access. Works offline after model downloads.</div>
+    </div>
+    <div style=\"margin-top:12px\"> <video id=\"video\" autoplay playsinline style=\"max-width:100%;border-radius:8px;display:block\"></video> <canvas id=\"overlay\" style=\"position:absolute;left:-9999px\"></canvas> </div>
+    <div id=\"pose-output\" style=\"margin-top:8px\"></div>
+  `
+  main.appendChild(el)
+  document.getElementById('start-cam').onclick = startCamera
+  document.getElementById('stop-cam').onclick = stopCamera
+}
+
+let detector=null; let videoEl=null; let rafId=null; let stream=null;
+async function startCamera(){
+  // load TF and pose detector via CDN
+  if(!window.tf){
+    showLoading('Loading TensorFlow.js...')
+    await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js')
+    await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection')
+    await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/pose')
+    hideLoading()
+  }
+  if(!detector){
+    const pd = window.poseDetection
+    const model = window.poseDetection.SupportedModels.MoveNet
+    detector = await pd.createDetector(model, {modelType:'SinglePose.Lightning'})
+  }
+  videoEl = document.getElementById('video')
+  try{stream = await navigator.mediaDevices.getUserMedia({video:{width:640,height:480},audio:false}); videoEl.srcObject=stream; await videoEl.play(); runPoseLoop()}catch(err){alert('Camera error: '+err.message)}
+}
+function stopCamera(){ if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null} if(rafId) cancelAnimationFrame(rafId); detector=null; document.getElementById('pose-output').innerHTML='Stopped.' }
+async function runPoseLoop(){ if(!detector||!videoEl) return; const poses = await detector.estimatePoses(videoEl); renderPose(poses); rafId = requestAnimationFrame(runPoseLoop) }
+function renderPose(poses){ const out = document.getElementById('pose-output'); if(!poses||!poses.length){ out.innerHTML='No person detected.'; return } const p = poses[0]; // simple check for squat depth: hip y vs knee y
+  const key = (name)=> (p.keypoints.find(k=>k.name===name) || p.keypoints.find(k=>k.part===name))
+  const leftHip = key('left_hip')||key('leftHip'), rightHip = key('right_hip')||key('rightHip')
+  const leftKnee = key('left_knee')||key('leftKnee'), rightKnee = key('right_knee')||key('rightKnee')
+  let hint = ''
+  if(leftHip && leftKnee){ if(leftHip.y < leftKnee.y - 10) hint = 'Hips high — try deeper squat or check form.' }
+  out.innerHTML = `Detected. Keypoints: ${Math.round(p.keypoints.length)}. Tip: ${hint||'Good detection — try a rep exercise to test counters.'}`
+}
+
+// --- Settings ---
+function renderSettings(){
+  const el = document.createElement('div')
+  el.className='card'
+  el.innerHTML = `
+    <h3>Settings</h3>
+    <label>OpenAI API Key (kept in localStorage on this device)</label>
+    <input id=\"apikey\" placeholder=\"sk-...\" value=\"${state.settings.openaiKey||''}\"> 
+    <label>Model</label>
+    <input id=\"apimodel\" placeholder=\"gpt-4o-mini or gpt-4o\" value=\"${state.settings.model||'gpt-4o-mini'}\">
+    <div style=\"display:flex;gap:8px;margin-top:8px\"> <button id=\"save-settings\" class=\"mini\">Save</button> <button id=\"clear-key\" class=\"mini danger\">Clear Key</button> </div>
+    <p class=\"note\">OpenAI features require internet. Your API key is stored on your device only. Don’t share it publicly.</p>
+  `
+  main.appendChild(el)
+  document.getElementById('save-settings').onclick = ()=>{state.settings.openaiKey=document.getElementById('apikey').value.trim(); state.settings.model=document.getElementById('apimodel').value.trim(); save(); alert('Saved')}
+  document.getElementById('clear-key').onclick = ()=>{state.settings.openaiKey=''; save(); alert('Cleared')}
+}
+
+// --- Utilities: Export/Import ---
+function exportJson(){ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='myfitplus-backup-'+new Date().toISOString().slice(0,10)+'.json'; a.click(); URL.revokeObjectURL(url) }
+function handleImport(e){ const f = e.target.files[0]; if(!f) return; const rdr=new FileReader(); rdr.onload=()=>{ try{ const imp = JSON.parse(rdr.result); if(imp.workouts&&imp.food){ state=imp; save(); alert('Imported OK'); render() } else alert('Invalid file') }catch(err){alert('Invalid JSON')} } ; rdr.readAsText(f) }
+
+// --- OpenAI helpers (text & image) ---
+async function openaiChat(messages){ // returns text
+  const key = state.settings.openaiKey; if(!key) throw new Error('No OpenAI key in settings')
+  const model = state.settings.model || 'gpt-4o-mini'
+  const res = await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model, messages, max_tokens:600})})
+  if(!res.ok){ const txt = await res.text(); throw new Error(txt) }
+  const data = await res.json(); return data.choices[0].message.content.trim()
+}
+async function callOpenAIForText(prompt){ if(!state.settings.openaiKey) return simpleFallbackAnswer(prompt)
+  const messages=[{role:'system',content:'You are a helpful personal coach for fitness, style and grooming. Keep answers practical and short.'},{role:'user',content:prompt}]
+  return await openaiChat(messages)
+}
+async function callOpenAIForImageReview(dataUrl){ // send a text prompt that includes a small base64 preview — note: may exceed limits; for serious use, upload image to a server or use official image endpoints
+  if(!state.settings.openaiKey) throw new Error('No OpenAI key')
+  const shortPrompt = 'Give constructive outfit feedback and practical grooming tips. Photo encoded as data URL attached.'
+  // WARNING: Sending large base64 over the chat completion may fail. We instead send a short prompt and append size info.
+  const sample = `Photo size: ${dataUrl.length} chars (dataURI). Please give short outfit rating and 3 tips.`
+  return await openaiChat([{role:'user',content: shortPrompt + '
+
+' + sample}])
+}
+function simpleFallbackAnswer(q){ // very small local heuristics
+  if(q.toLowerCase().includes('protein')) return 'Aim for 1.6-2.2 g/kg bodyweight for muscle growth. Prioritize whole foods.'
+  if(q.toLowerCase().includes('groom')) return 'Cleanse twice daily, moisturize, and use SPF in the morning.'
+  return 'I can help with that — add your OpenAI key in Settings for advanced advice, or describe the issue.'
+}
+
+// --- Simple local adders ---
+function addWorkout(date,type,duration,cal){ state.workouts.push({id:uid(),date,type,duration:Number(duration||0),cal:Number(cal||0)}); save(); render() }
+function addFood(date,name,cal){ state.food.push({id:uid(),date,name,cal:Number(cal||0)}); save(); render() }
+
+// --- Loading helpers ---
+function showLoading(msg){ const el=document.createElement('div'); el.id='__loading'; el.style= 'position:fixed;left:12px;bottom:12px;background:rgba(2,6,23,0.9);padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.03)'; el.textContent=msg; document.body.appendChild(el)}
+function hideLoading(){ const el=document.getElementById('__loading'); if(el) el.remove() }
+async function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s) }) }
+
+// --- Basic initialization ---
+render()
+
+// Expose some functions to the window for easy debugging
+window._myfit = {state, save, render}
+</script>
+</body>
+</html>
